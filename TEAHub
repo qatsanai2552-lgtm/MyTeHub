@@ -1,0 +1,135 @@
+local TweenService = game:GetService("TweenService")
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+
+local LocalPlayer = Players.LocalPlayer
+local camera = workspace.CurrentCamera
+local playerGui = LocalPlayer:WaitForChild("PlayerGui")
+
+local _G = {
+    Enabled = false,
+    FOV = 100,
+    HitboxSize = 10,
+    Speed = 50
+}
+
+if playerGui:FindFirstChild("TeHub") then playerGui.TeHub:Destroy() end
+
+local sg = Instance.new("ScreenGui")
+sg.Name = "TeHub"
+sg.ResetOnSpawn = false
+sg.Parent = playerGui
+
+local loading = Instance.new("Frame", sg)
+loading.Size = UDim2.new(1, 0, 1, 0)
+loading.BackgroundTransparency = 1
+
+local welcome = Instance.new("TextLabel", loading)
+welcome.Size = UDim2.new(1, 0, 0.1, 0)
+welcome.Position = UDim2.new(0, 0, 0.45, 0)
+welcome.BackgroundTransparency = 1
+welcome.TextColor3 = Color3.fromRGB(255, 255, 255)
+welcome.TextScaled = true
+welcome.Font = Enum.Font.SourceSansBold
+welcome.Text = "💎 ยินดีต้อนรับ: เต้ อัสนัย 💎"
+
+local main = Instance.new("Frame", sg)
+main.Size = UDim2.new(0, 140, 0, 180)
+main.Position = UDim2.new(1, -160, 0.4, 0)
+main.BackgroundColor3 = Color3.fromRGB(30, 25, 45)
+main.Visible = false
+Instance.new("UICorner", main)
+
+local layout = Instance.new("UIListLayout", main)
+layout.Padding = UDim.new(0, 5)
+layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+layout.SortOrder = Enum.SortOrder.LayoutOrder
+
+Instance.new("UIPadding", main).PaddingTop = UDim.new(0, 8)
+
+local function createBtn(text, callback)
+    local btn = Instance.new("TextButton", main)
+    btn.Size = UDim2.new(0.9, 0, 0, 35)
+    btn.BackgroundColor3 = Color3.fromRGB(50, 45, 70)
+    btn.Text = text .. ": ปิด"
+    btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    btn.TextSize = 12
+    btn.Font = Enum.Font.SourceSansBold
+    Instance.new("UICorner", btn)
+
+    local st = false
+    btn.MouseButton1Click:Connect(function()
+        st = not st
+        btn.Text = text .. (st and ": เปิด" or ": ปิด")
+        btn.BackgroundColor3 = st and Color3.fromRGB(120, 80, 255) or Color3.fromRGB(50, 45, 70)
+        callback(st)
+    end)
+end
+
+task.delay(2, function()
+    TweenService:Create(welcome, TweenInfo.new(0.5), {TextTransparency = 1}):Play()
+    task.wait(0.5)
+    loading:Destroy()
+    main.Visible = true
+end)
+
+createBtn("Aimbot", function(v) _G.Enabled = v end)
+createBtn("Big Hitbox", function(v)
+    _G.Hitbox = v
+    task.spawn(function()
+        while _G.Hitbox do
+            for _, p in pairs(Players:GetPlayers()) do
+                if p ~= LocalPlayer and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
+                    p.Character.HumanoidRootPart.Size = Vector3.new(_G.HitboxSize, _G.HitboxSize, _G.HitboxSize)
+                    p.Character.HumanoidRootPart.Transparency = 0.8
+                end
+            end
+            task.wait(1)
+        end
+    end)
+end)
+createBtn("Speed", function(v)
+    _G.Spd = v
+    RunService.Stepped:Connect(function()
+        if _G.Spd and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
+            LocalPlayer.Character.Humanoid.WalkSpeed = _G.Speed
+        else
+            LocalPlayer.Character.Humanoid.WalkSpeed = 16
+        end
+    end)
+end)
+
+local fov = Drawing.new("Circle")
+fov.Thickness = 1
+fov.Color = Color3.fromRGB(255, 255, 255)
+fov.Transparency = 0.5
+fov.Filled = false
+
+RunService.RenderStepped:Connect(function()
+    fov.Visible = _G.Enabled
+    fov.Radius = _G.FOV
+    fov.Position = Vector2.new(camera.ViewportSize.X/2, camera.ViewportSize.Y/2)
+    
+    if _G.Enabled then
+        local target = nil
+        local dist = _G.FOV
+        for _, v in pairs(Players:GetPlayers()) do
+            if v ~= LocalPlayer and v.Character and v.Character:FindFirstChild("Head") then
+                local p, vis = camera:WorldToViewportPoint(v.Character.Head.Position)
+                local mag = (Vector2.new(p.X, p.Y) - fov.Position).Magnitude
+                if vis and mag < dist then dist = mag; target = v end
+            end
+        end
+        if target then camera.CFrame = camera.CFrame:Lerp(CFrame.new(camera.CFrame.Position, target.Character.Head.Position), 0.2) end
+    end
+end)
+
+local tgl = Instance.new("TextButton", sg)
+tgl.Size = UDim2.new(0, 35, 0, 35)
+tgl.Position = UDim2.new(0, 10, 0, 10)
+tgl.Text = "💎"
+tgl.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+Instance.new("UICorner", tgl).CornerRadius = UDim.new(1, 0)
+tgl.MouseButton1Click:Connect(function() main.Visible = not main.Visible end)
+
