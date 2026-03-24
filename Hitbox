@@ -1,0 +1,176 @@
+local TweenService = game:GetService("TweenService")
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local SoundService = game:GetService("SoundService")
+
+local LocalPlayer = Players.LocalPlayer
+local camera = workspace.CurrentCamera
+local playerGui = LocalPlayer:WaitForChild("PlayerGui")
+
+-- ตั้งค่าระบบ (ลบ Speed ออกแล้ว)
+local _G = {
+    Enabled = false,
+    Hitbox = false,
+    FOV = 100,
+    HitboxSize = 10,
+    Smoothness = 0.12, 
+    TargetPart = "Head"
+}
+
+-- ลบ UI เก่าถ้ามี
+if playerGui:FindFirstChild("TeHub") then playerGui.TeHub:Destroy() end
+
+local sg = Instance.new("ScreenGui")
+sg.Name = "TeHub"
+sg.ResetOnSpawn = false
+sg.Parent = playerGui
+
+-- หน้าจอโหลด
+local loading = Instance.new("Frame", sg)
+loading.Size = UDim2.new(1, 0, 1, 0)
+loading.BackgroundTransparency = 1
+
+local welcome = Instance.new("TextLabel", loading)
+welcome.Size = UDim2.new(1, 0, 0.1, 0)
+welcome.Position = UDim2.new(0, 0, 0.45, 0)
+welcome.BackgroundTransparency = 1
+welcome.TextColor3 = Color3.fromRGB(255, 255, 255)
+welcome.TextScaled = true
+welcome.Font = Enum.Font.SourceSansBold
+welcome.Text = "💎 ยินดีต้อนรับ: เต้ อัสนัย 💎"
+
+-- เมนูหลัก (ปรับขนาดให้สั้นลงเพราะเหลือ 2 ปุ่ม)
+local main = Instance.new("Frame", sg)
+main.Size = UDim2.new(0, 140, 0, 135)
+main.Position = UDim2.new(1, -160, 0.4, 0)
+main.BackgroundColor3 = Color3.fromRGB(30, 25, 45)
+main.Visible = false
+Instance.new("UICorner", main)
+
+local layout = Instance.new("UIListLayout", main)
+layout.Padding = UDim.new(0, 5)
+layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+layout.SortOrder = Enum.SortOrder.LayoutOrder
+Instance.new("UIPadding", main).PaddingTop = UDim.new(0, 8)
+
+-- เสียงกดปุ่ม
+local sound = Instance.new("Sound", SoundService)
+sound.SoundId = "rbxassetid://9118823102"
+sound.Volume = 1
+
+-- ฟังก์ชันสร้างปุ่ม
+local function createBtn(text, callback)
+    local btn = Instance.new("TextButton", main)
+    btn.Size = UDim2.new(0.9, 0, 0, 35)
+    btn.BackgroundColor3 = Color3.fromRGB(50, 45, 70)
+    btn.Text = text .. ": ปิด"
+    btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    btn.TextSize = 12
+    btn.Font = Enum.Font.SourceSansBold
+    Instance.new("UICorner", btn)
+
+    local st = false
+    btn.MouseButton1Click:Connect(function()
+        st = not st
+        sound:Play()
+        btn.Text = text .. (st and ": เปิด" or ": ปิด")
+        btn.BackgroundColor3 = st and Color3.fromRGB(120, 80, 255) or Color3.fromRGB(50, 45, 70)
+        callback(st)
+    end)
+end
+
+-- เริ่มต้นแสดง UI
+task.delay(2, function()
+    TweenService:Create(welcome, TweenInfo.new(0.5), {TextTransparency = 1}):Play()
+    task.wait(0.5)
+    loading:Destroy()
+    main.Visible = true
+end)
+
+-- สร้างปุ่ม (เหลือเฉพาะ Aimbot และ Hitbox)
+createBtn("Aimbot", function(v) _G.Enabled = v end)
+createBtn("Big Hitbox", function(v)
+    _G.Hitbox = v
+    task.spawn(function()
+        while _G.Hitbox do
+            for _, p in pairs(Players:GetPlayers()) do
+                if p ~= LocalPlayer and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
+                    p.Character.HumanoidRootPart.Size = Vector3.new(_G.HitboxSize, _G.HitboxSize, _G.HitboxSize)
+                    p.Character.HumanoidRootPart.Transparency = 0.8
+                end
+            end
+            task.wait(1)
+        end
+    end)
+end)
+
+-- วงกลม FOV RGB
+local fov = Drawing.new("Circle")
+fov.Thickness = 1
+fov.Transparency = 0.5
+fov.Filled = false
+fov.Visible = false
+
+task.spawn(function()
+    local hue = 0
+    while true do
+        hue = (hue + 1) % 360
+        fov.Color = Color3.fromHSV(hue / 360, 1, 1)
+        task.wait(0.03)
+    end
+end)
+
+-- ฟังก์ชันหาเป้าหมายพร้อม Wall Check
+local function getClosestTarget()
+    local target = nil
+    local dist = _G.FOV
+    local center = Vector2.new(camera.ViewportSize.X/2, camera.ViewportSize.Y/2)
+
+    for _, v in pairs(Players:GetPlayers()) do
+        if v ~= LocalPlayer and v.Team ~= LocalPlayer.Team and v.Character and v.Character:FindFirstChild(_G.TargetPart) and v.Character:FindFirstChild("Humanoid") and v.Character.Humanoid.Health > 0 then
+            local part = v.Character[_G.TargetPart]
+            local pos, vis = camera:WorldToViewportPoint(part.Position)
+            
+            if vis then
+                local rayParams = RaycastParams.new()
+                rayParams.FilterDescendantsInstances = {LocalPlayer.Character}
+                rayParams.FilterType = Enum.RaycastFilterType.Blacklist
+                local result = workspace:Raycast(camera.CFrame.Position, (part.Position - camera.CFrame.Position), rayParams)
+                
+                if result and result.Instance and result.Instance:IsDescendantOf(v.Character) then
+                    local mag = (Vector2.new(pos.X, pos.Y) - center).Magnitude
+                    if mag < dist then
+                        dist = mag
+                        target = part
+                    end
+                end
+            end
+        end
+    end
+    return target
+end
+
+-- ระบบทำงานหลัก
+RunService.RenderStepped:Connect(function()
+    fov.Visible = _G.Enabled
+    fov.Radius = _G.FOV
+    fov.Position = Vector2.new(camera.ViewportSize.X/2, camera.ViewportSize.Y/2)
+    
+    if _G.Enabled then
+        local target = getClosestTarget()
+        if target then 
+            camera.CFrame = camera.CFrame:Lerp(CFrame.new(camera.CFrame.Position, target.Position), _G.Smoothness) 
+        end
+    end
+end)
+
+-- ปุ่มเปิด/ปิดเมนู
+local tgl = Instance.new("TextButton", sg)
+tgl.Size = UDim2.new(0, 35, 0, 35)
+tgl.Position = UDim2.new(0, 10, 0, 10)
+tgl.Text = "💎"
+tgl.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+tgl.TextColor3 = Color3.fromRGB(255, 255, 255)
+Instance.new("UICorner", tgl).CornerRadius = UDim.new(1, 0)
+tgl.MouseButton1Click:Connect(function() main.Visible = not main.Visible end)
+                              
