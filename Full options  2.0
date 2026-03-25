@@ -1,0 +1,313 @@
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+
+local Window = Rayfield:CreateWindow({
+   Name = "💎 TeHub | Premium [RAGE] 💎",
+   LoadingTitle = "โดย เต้ อัสนัย",
+   LoadingSubtitle = "Script By Te Assanai",
+   ConfigurationPath = "TeHubConfig"
+})
+
+local _G = {
+    Enabled = false,
+    Hitbox = false,
+    WallCheck = false,
+    ESP_Enabled = false,
+    ESP_Mode = "ผู้เล่นทั้งหมด",
+    ShowTracers = false,
+    FOV = 120,
+    HitboxSize = 25,
+    TargetPart = "Head",
+    SelectedPlayer = "",
+    SpeedValue = 16,
+    Smoothness = 0
+}
+
+local fovCircle = Drawing.new("Circle")
+fovCircle.Thickness = 1
+fovCircle.Transparency = 0.5
+fovCircle.Color = Color3.fromRGB(255, 0, 0)
+fovCircle.Visible = false
+fovCircle.Filled = false
+fovCircle.NumSides = 64
+
+local MainTab = Window:CreateTab("ระบบต่อสู้", 4483362458)
+local ESPTab = Window:CreateTab("ระบบมองทะลุ", 4483362458)
+local PlayerTab = Window:CreateTab("ผู้เล่น", 4483362458)
+local SettingTab = Window:CreateTab("ตั้งค่า", 4483362458)
+
+MainTab:CreateSection("Aimbot [ล็อกหัวทันที]")
+MainTab:CreateToggle({
+   Name = "เปิดระบบ Aimbot",
+   CurrentValue = false,
+   Callback = function(Value)
+      _G.Enabled = Value
+      fovCircle.Visible = Value
+   end,
+})
+
+MainTab:CreateToggle({
+   Name = "ไม่ล็อกถ้าอยู่หลังกำแพง (Wall Check)",
+   CurrentValue = false,
+   Callback = function(Value)
+      _G.WallCheck = Value
+   end,
+})
+
+MainTab:CreateSlider({
+   Name = "ระยะวงกลม FOV",
+   Range = {50, 800},
+   Increment = 10,
+   CurrentValue = 120,
+   Callback = function(Value) _G.FOV = Value end,
+})
+
+MainTab:CreateDropdown({
+   Name = "ระดับความตึง",
+   Options = {"สายโหด (ล็อกทันที)", "เนียนๆ (ลื่นไหล)"},
+   CurrentOption = "สายโหด (ล็อกทันที)",
+   Callback = function(Option)
+       if Option == "สายโหด (ล็อกทันที)" then _G.Smoothness = 0 else _G.Smoothness = 0.1 end
+   end,
+})
+
+MainTab:CreateSection("Hitbox [ขยายตัวศัตรู]")
+MainTab:CreateToggle({
+   Name = "เปิดระบบ Big Hitbox",
+   CurrentValue = false,
+   Callback = function(Value) _G.Hitbox = Value end,
+})
+
+MainTab:CreateSlider({
+   Name = "ขนาด Hitbox",
+   Range = {2, 100},
+   Increment = 1,
+   CurrentValue = 25,
+   Callback = function(Value) _G.HitboxSize = Value end,
+})
+
+ESPTab:CreateSection("ตั้งค่าการมองเห็น")
+ESPTab:CreateToggle({
+   Name = "เปิด ESP (กรอบ)",
+   CurrentValue = false,
+   Callback = function(Value) _G.ESP_Enabled = Value end,
+})
+
+ESPTab:CreateToggle({
+   Name = "เปิด Tracers (เส้นลาก)",
+   CurrentValue = false,
+   Callback = function(Value) _G.ShowTracers = Value end,
+})
+
+ESPTab:CreateDropdown({
+   Name = "โหมดการมอง",
+   Options = {"ผู้เล่นทั้งหมด", "เฉพาะที่เลือก"},
+   CurrentOption = "ผู้เล่นทั้งหมด",
+   Callback = function(Option) _G.ESP_Mode = Option end,
+})
+
+PlayerTab:CreateSection("ความเร็วตัวละคร")
+PlayerTab:CreateSlider({
+   Name = "ปรับความเร็ว (Speed)",
+   Range = {16, 500},
+   Increment = 1,
+   Suffix = " Speed",
+   CurrentValue = 16,
+   Callback = function(Value) _G.SpeedValue = Value end,
+})
+
+PlayerTab:CreateSection("จัดการผู้เล่น")
+local PlayerDropdown = PlayerTab:CreateDropdown({
+   Name = "เลือกชื่อผู้เล่น",
+   Options = {},
+   CurrentOption = "",
+   Callback = function(Option)
+      if type(Option) == "table" then _G.SelectedPlayer = Option[1] else _G.SelectedPlayer = Option end
+   end,
+})
+
+local function RefreshPlayers()
+    local p_list = {}
+    for _, p in pairs(game.Players:GetPlayers()) do
+        if p ~= game.Players.LocalPlayer then table.insert(p_list, p.Name) end
+    end
+    PlayerDropdown:Refresh(p_list)
+end
+
+PlayerTab:CreateButton({Name = "🔄 อัปเดตรายชื่อผู้เล่น", Callback = function() RefreshPlayers() end})
+
+PlayerTab:CreateButton({
+   Name = "🚀 วาร์ปไปหาผู้เล่นนี้",
+   Callback = function()
+       local target = game.Players:FindFirstChild(_G.SelectedPlayer)
+       if target and target.Character then
+           game.Players.LocalPlayer.Character.HumanoidRootPart.CFrame = target.Character.HumanoidRootPart.CFrame * CFrame.new(0, 0, 3)
+       end
+   end,
+})
+
+PlayerTab:CreateButton({
+   Name = "👁️ ส่องดูผู้เล่นนี้",
+   Callback = function()
+       local target = game.Players:FindFirstChild(_G.SelectedPlayer)
+       if target and target.Character then workspace.CurrentCamera.CameraSubject = target.Character.Humanoid end
+   end,
+})
+
+PlayerTab:CreateButton({
+   Name = "🔙 กลับมาดูตัวเอง",
+   Callback = function()
+       workspace.CurrentCamera.CameraSubject = game.Players.LocalPlayer.Character.Humanoid
+   end,
+})
+
+SettingTab:CreateSection("เพิ่มประสิทธิภาพ")
+SettingTab:CreateButton({
+   Name = "🚀 ลดแลค (FPS Boost)",
+   Callback = function()
+       for _, v in pairs(game:GetDescendants()) do
+           if v:IsA("Part") or v:IsA("MeshPart") then v.Material = "SmoothPlastic" v.Reflectance = 0
+           elseif v:IsA("Decal") or v:IsA("Texture") then v:Destroy() end
+       end
+   end,
+})
+
+SettingTab:CreateSection("เครดิต")
+local creditLabel = SettingTab:CreateParagraph({Title = "โดย เต้ อัสนัย", Content = "Script By Te Assanai"})
+
+local function IsVisible(targetPart)
+    if not _G.WallCheck then return true end
+    local camera = workspace.CurrentCamera
+    local character = game.Players.LocalPlayer.Character
+    if not character then return false end
+    
+    local params = RaycastParams.new()
+    params.FilterType = Enum.RaycastFilterType.Blacklist
+    params.FilterDescendantsInstances = {character, camera}
+    
+    local origin = camera.CFrame.Position
+    local direction = (targetPart.Position - origin).Unit * (targetPart.Position - origin).Magnitude
+    local result = workspace:Raycast(origin, direction, params)
+    
+    if result then
+        return result.Instance:IsDescendantOf(targetPart.Parent)
+    end
+    return false
+end
+
+local function CreateESP(plr)
+    local Box = Drawing.new("Square")
+    Box.Visible = false
+    Box.Color = Color3.fromRGB(0, 255, 0)
+    Box.Thickness = 1
+    Box.Filled = false
+
+    local Name = Drawing.new("Text")
+    Name.Visible = false
+    Name.Center = true
+    Name.Outline = true
+    Name.Size = 13
+    Name.Color = Color3.fromRGB(255, 255, 255)
+
+    local Tracer = Drawing.new("Line")
+    Tracer.Visible = false
+    Tracer.Color = Color3.fromRGB(255, 255, 255)
+    Tracer.Thickness = 1
+
+    game:GetService("RunService").RenderStepped:Connect(function()
+        local shouldShow = false
+        if _G.ESP_Enabled and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") and plr.Character:FindFirstChild("Humanoid") then
+            if plr.Character.Humanoid.Health > 0 then
+                if _G.ESP_Mode == "ผู้เล่นทั้งหมด" then shouldShow = true
+                elseif _G.ESP_Mode == "เฉพาะที่เลือก" and plr.Name == _G.SelectedPlayer then shouldShow = true end
+            end
+        end
+
+        if shouldShow then
+            local r_pos, vis = workspace.CurrentCamera:WorldToViewportPoint(plr.Character.HumanoidRootPart.Position)
+            if vis then
+                local size = (workspace.CurrentCamera:WorldToViewportPoint(plr.Character.HumanoidRootPart.Position - Vector3.new(0, 3, 0)).Y - workspace.CurrentCamera:WorldToViewportPoint(plr.Character.HumanoidRootPart.Position + Vector3.new(0, 2.6, 0)).Y)
+                local width = size / 1.5
+                
+                Box.Size = Vector2.new(width, size)
+                Box.Position = Vector2.new(r_pos.X - width / 2, r_pos.Y - size / 2)
+                Box.Color = (plr.Team ~= game.Players.LocalPlayer.Team) and Color3.fromRGB(255, 0, 0) or Color3.fromRGB(0, 255, 0)
+                Box.Visible = true
+
+                Name.Position = Vector2.new(r_pos.X, r_pos.Y + (size / 2) + 2)
+                Name.Text = plr.Name
+                Name.Visible = true
+
+                if _G.ShowTracers then
+                    Tracer.From = Vector2.new(workspace.CurrentCamera.ViewportSize.X / 2, workspace.CurrentCamera.ViewportSize.Y)
+                    Tracer.To = Vector2.new(r_pos.X, r_pos.Y + (size / 2))
+                    Tracer.Visible = true
+                else Tracer.Visible = false end
+            else Box.Visible = false Name.Visible = false Tracer.Visible = false end
+        else Box.Visible = false Name.Visible = false Tracer.Visible = false end
+    end)
+end
+
+for _, v in pairs(game.Players:GetPlayers()) do if v ~= game.Players.LocalPlayer then CreateESP(v) end end
+game.Players.PlayerAdded:Connect(function(v) CreateESP(v) end)
+
+game:GetService("RunService").RenderStepped:Connect(function()
+    local lp = game.Players.LocalPlayer
+    local camera = workspace.CurrentCamera
+    
+    if fovCircle.Visible then
+        fovCircle.Radius = _G.FOV
+        fovCircle.Position = Vector2.new(camera.ViewportSize.X/2, camera.ViewportSize.Y/2)
+    end
+    
+    if _G.Enabled then
+        local target = nil
+        local shortestDist = _G.FOV
+        
+        for _, v in pairs(game.Players:GetPlayers()) do
+            if v ~= lp and v.Character and v.Character:FindFirstChild("Head") and v.Character:FindFirstChild("Humanoid") then
+                if v.Character.Humanoid.Health > 0 and (v.Team ~= lp.Team or v.Team == nil) then
+                    local head = v.Character.Head
+                    local pos, vis = camera:WorldToViewportPoint(head.Position)
+                    
+                    if vis and IsVisible(head) then
+                        local mag = (Vector2.new(pos.X, pos.Y) - Vector2.new(camera.ViewportSize.X/2, camera.ViewportSize.Y/2)).Magnitude
+                        if mag < shortestDist then
+                            shortestDist = mag
+                            target = head
+                        end
+                    end
+                end
+            end
+        end
+
+        if target then
+            if _G.Smoothness == 0 then
+                camera.CFrame = CFrame.new(camera.CFrame.Position, target.Position)
+            else
+                camera.CFrame = camera.CFrame:Lerp(CFrame.new(camera.CFrame.Position, target.Position), _G.Smoothness)
+            end
+        end
+    end
+
+    if lp.Character and lp.Character:FindFirstChild("Humanoid") then
+        lp.Character.Humanoid.WalkSpeed = _G.SpeedValue
+        if _G.Hitbox then
+            for _, p in pairs(game.Players:GetPlayers()) do
+                if p ~= lp and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
+                    if (p.Team ~= lp.Team or p.Team == nil) then
+                        p.Character.HumanoidRootPart.Size = Vector3.new(_G.HitboxSize, _G.HitboxSize, _G.HitboxSize)
+                        p.Character.HumanoidRootPart.Transparency = 0.8
+                        p.Character.HumanoidRootPart.CanCollide = false
+                    else
+                        p.Character.HumanoidRootPart.Size = Vector3.new(2, 2, 1)
+                        p.Character.HumanoidRootPart.Transparency = 1
+                    end
+                end
+            end
+        end
+    end
+end)
+
+RefreshPlayers()
+Rayfield:Notify({Title = "TeHub Premium", Content = "โหลดเสร็จสมบูรณ์!", Duration = 3})
+
