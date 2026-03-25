@@ -1,7 +1,7 @@
 local TweenService = game:GetService("TweenService")
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
-local UserInputService = game:GetService("UserInputService")
+local SoundService = game:GetService("SoundService")
 
 local LocalPlayer = Players.LocalPlayer
 local camera = workspace.CurrentCamera
@@ -9,9 +9,11 @@ local playerGui = LocalPlayer:WaitForChild("PlayerGui")
 
 local _G = {
     Enabled = false,
-    FOV = 100,
-    HitboxSize = 10,
-    Speed = 50
+    Hitbox = false,
+    FOV = 120,
+    HitboxSize = 12,
+    Smoothness = 0.2,
+    TargetPart = "Head"
 }
 
 if playerGui:FindFirstChild("TeHub") then playerGui.TeHub:Destroy() end
@@ -35,7 +37,7 @@ welcome.Font = Enum.Font.SourceSansBold
 welcome.Text = "💎 ยินดีต้อนรับ: เต้ อัสนัย 💎"
 
 local main = Instance.new("Frame", sg)
-main.Size = UDim2.new(0, 140, 0, 180)
+main.Size = UDim2.new(0, 140, 0, 135)
 main.Position = UDim2.new(1, -160, 0.4, 0)
 main.BackgroundColor3 = Color3.fromRGB(30, 25, 45)
 main.Visible = false
@@ -45,8 +47,11 @@ local layout = Instance.new("UIListLayout", main)
 layout.Padding = UDim.new(0, 5)
 layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
 layout.SortOrder = Enum.SortOrder.LayoutOrder
-
 Instance.new("UIPadding", main).PaddingTop = UDim.new(0, 8)
+
+local sound = Instance.new("Sound", SoundService)
+sound.SoundId = "rbxassetid://9118823102"
+sound.Volume = 1
 
 local function createBtn(text, callback)
     local btn = Instance.new("TextButton", main)
@@ -61,13 +66,14 @@ local function createBtn(text, callback)
     local st = false
     btn.MouseButton1Click:Connect(function()
         st = not st
+        sound:Play()
         btn.Text = text .. (st and ": เปิด" or ": ปิด")
         btn.BackgroundColor3 = st and Color3.fromRGB(120, 80, 255) or Color3.fromRGB(50, 45, 70)
         callback(st)
     end)
 end
 
-task.delay(2, function()
+task.delay(1.5, function()
     TweenService:Create(welcome, TweenInfo.new(0.5), {TextTransparency = 1}):Play()
     task.wait(0.5)
     loading:Destroy()
@@ -80,31 +86,61 @@ createBtn("Big Hitbox", function(v)
     task.spawn(function()
         while _G.Hitbox do
             for _, p in pairs(Players:GetPlayers()) do
-                if p ~= LocalPlayer and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
+                if p ~= LocalPlayer and p.Team ~= LocalPlayer.Team and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
                     p.Character.HumanoidRootPart.Size = Vector3.new(_G.HitboxSize, _G.HitboxSize, _G.HitboxSize)
                     p.Character.HumanoidRootPart.Transparency = 0.8
+                    p.Character.HumanoidRootPart.CanCollide = false
                 end
             end
             task.wait(1)
         end
     end)
 end)
-createBtn("Speed", function(v)
-    _G.Spd = v
-    RunService.Stepped:Connect(function()
-        if _G.Spd and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
-            LocalPlayer.Character.Humanoid.WalkSpeed = _G.Speed
-        else
-            LocalPlayer.Character.Humanoid.WalkSpeed = 16
-        end
-    end)
-end)
 
 local fov = Drawing.new("Circle")
 fov.Thickness = 1
-fov.Color = Color3.fromRGB(255, 255, 255)
 fov.Transparency = 0.5
 fov.Filled = false
+fov.Visible = false
+
+task.spawn(function()
+    local hue = 0
+    while true do
+        hue = (hue + 1) % 360
+        fov.Color = Color3.fromHSV(hue / 360, 1, 1)
+        task.wait(0.03)
+    end
+end)
+
+local function getClosestTarget()
+    local target = nil
+    local shortestDist = _G.FOV
+    local center = Vector2.new(camera.ViewportSize.X/2, camera.ViewportSize.Y/2)
+
+    for _, v in pairs(Players:GetPlayers()) do
+        if v ~= LocalPlayer and v.Team ~= LocalPlayer.Team and v.Character and v.Character:FindFirstChild(_G.TargetPart) then
+            local humanoid = v.Character:FindFirstChild("Humanoid")
+            if humanoid and humanoid.Health > 0 then
+                local part = v.Character[_G.TargetPart]
+                local pos, vis = camera:WorldToViewportPoint(part.Position)
+                
+                if vis then
+                    local mag = (Vector2.new(pos.X, pos.Y) - center).Magnitude
+                    if mag < shortestDist then
+                        local ray = camera:ViewportPointToRay(pos.X, pos.Y)
+                        local raycastResult = workspace:FindPartOnRayWithIgnoreList(Ray.new(ray.Origin, ray.Direction * 1000), {LocalPlayer.Character})
+                        
+                        if raycastResult and raycastResult:IsDescendantOf(v.Character) then
+                            shortestDist = mag
+                            target = part
+                        end
+                    end
+                end
+            end
+        end
+    end
+    return target
+end
 
 RunService.RenderStepped:Connect(function()
     fov.Visible = _G.Enabled
@@ -112,16 +148,10 @@ RunService.RenderStepped:Connect(function()
     fov.Position = Vector2.new(camera.ViewportSize.X/2, camera.ViewportSize.Y/2)
     
     if _G.Enabled then
-        local target = nil
-        local dist = _G.FOV
-        for _, v in pairs(Players:GetPlayers()) do
-            if v ~= LocalPlayer and v.Character and v.Character:FindFirstChild("Head") then
-                local p, vis = camera:WorldToViewportPoint(v.Character.Head.Position)
-                local mag = (Vector2.new(p.X, p.Y) - fov.Position).Magnitude
-                if vis and mag < dist then dist = mag; target = v end
-            end
+        local target = getClosestTarget()
+        if target then 
+            camera.CFrame = camera.CFrame:Lerp(CFrame.new(camera.CFrame.Position, target.Position), _G.Smoothness) 
         end
-        if target then camera.CFrame = camera.CFrame:Lerp(CFrame.new(camera.CFrame.Position, target.Character.Head.Position), 0.2) end
     end
 end)
 
@@ -130,6 +160,6 @@ tgl.Size = UDim2.new(0, 35, 0, 35)
 tgl.Position = UDim2.new(0, 10, 0, 10)
 tgl.Text = "💎"
 tgl.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+tgl.TextColor3 = Color3.fromRGB(255, 255, 255)
 Instance.new("UICorner", tgl).CornerRadius = UDim.new(1, 0)
 tgl.MouseButton1Click:Connect(function() main.Visible = not main.Visible end)
-
